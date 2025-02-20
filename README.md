@@ -29,12 +29,11 @@ For example two : ,
 -cout << "Name: " << name << endl; : this one will help to display name as it is inside the quotation marks, name you entered and also allow your program to start another line by that endl, 
 -cout << "Age: " << age << endl;: this one will help to display age as it is inside the quotation marks, age you entered and also allow your program to start another line by that endl,
 -cout << "Price: $" << price << endl; : this one will help to display price as it is inside the quotation marks, price you entered and also allow your program to start another line by that endl,
--cout << "Grade: " << grade << endl;: this one will help to display grade as it is inside the quotation marks, grade you entered and also allow your program to start another line by that endl,
-    
+-cout << "Grade: " << grade << endl;: this one will help to display grade as it is inside the quotation marks, grade you entered and also allow your program to start another line by that endl, 
 -return0; : helps us to check if the programs executed successfully,
 -{} : these braces are used to help us call the function without using function calls,
 
 
-
+For example three: the new thing there is cin >> this is used to initialise when you didn't initialise at the decralation
 
 
