@@ -1,1 +1,194 @@
+#include <iostream>
+#include <algorithm>
+
+using namespace std;
+
+struct Denomination {
+    int value;
+    int* count;
+};
+
+// Global dynamic denomination array
+Denomination* denoms = nullptr;
+int denomCount = 0;
+
+// Adds a denomination dynamically
+void addDenomination(int value, int count) {
+    // Check if value already exists
+    for (int i = 0; i < denomCount; ++i) {
+        if ((denoms + i)->value == value) {
+            *(denoms[i].count) += count;
+            return;
+        }
+    }
+
+    Denomination* newArr = new Denomination[denomCount + 1];
+    for (int i = 0; i < denomCount; ++i)
+        *(newArr + i) = *(denoms + i);
+
+    newArr[denomCount].value = value;
+    newArr[denomCount].count = new int(count);
+
+    delete[] denoms;
+    denoms = newArr;
+    ++denomCount;
+}
+
+// Removes a denomination
+void removeDenomination(int value) {
+    int index = -1;
+    for (int i = 0; i < denomCount; ++i) {
+        if ((denoms + i)->value == value) {
+            index = i;
+            break;
+        }
+    }
+    if (index == -1) return;
+
+    Denomination* newArr = new Denomination[denomCount - 1];
+    for (int i = 0, j = 0; i < denomCount; ++i) {
+        if (i == index) {
+            delete denoms[i].count;
+            continue;
+        }
+        *(newArr + j++) = *(denoms + i);
+    }
+    delete[] denoms;
+    denoms = newArr;
+    --denomCount;
+}
+
+// Abstract base class
+class CashDispenser {
+public:
+    virtual bool dispense(int amount) = 0;
+    virtual ~CashDispenser() {}
+};
+
+// Greedy strategy dispenser
+class GreedyDispenser : public CashDispenser {
+public:
+    bool dispense(int amount) override {
+        cout << "\n[Greedy Dispenser] Dispensing $" << amount << "...\n";
+        int* temp = new int[denomCount];
+        for (int i = 0; i < denomCount; ++i) temp[i] = *(denoms + i)->count;
+
+        // Sort denominations descending
+        sort(denoms, denoms + denomCount, [](const Denomination& a, const Denomination& b) {
+            return a.value > b.value;
+        });
+
+        int remaining = amount;
+        for (int i = 0; i < denomCount && remaining > 0; ++i) {
+            Denomination* d = denoms + i;
+            int num = min(*(d->count), remaining / d->value);
+            remaining -= num * d->value;
+            *(d->count) -= num;
+            if (num > 0)
+                cout << "Dispensed " << num << " x $" << d->value << "\n";
+        }
+
+        if (remaining > 0) {
+            cout << "Unable to dispense full amount. Refunding.\n";
+            for (int i = 0; i < denomCount; ++i)
+                *(denoms + i)->count = temp[i];
+            delete[] temp;
+            return false;
+        }
+
+        delete[] temp;
+        return true;
+    }
+};
+
+// Optimal strategy dispenser (minimal number of notes using brute-force)
+class OptimalDispenser : public CashDispenser {
+public:
+    bool dispense(int amount) override {
+        cout << "\n[Optimal Dispenser] Dispensing $" << amount << " (minimal notes)...\n";
+        int minNotes = INT_MAX;
+        int* bestUsed = new int[denomCount]{};
+        bool found = false;
+
+        // Brute-force all combinations (backtracking)
+        backtrack(0, amount, 0, new int[denomCount]{}, bestUsed, minNotes, found);
+
+        if (!found) {
+            cout << "Unable to dispense full amount.\n";
+            delete[] bestUsed;
+            return false;
+        }
+
+        for (int i = 0; i < denomCount; ++i) {
+            if (bestUsed[i] > 0) {
+                *(denoms + i)->count -= bestUsed[i];
+                cout << "Dispensed " << bestUsed[i] << " x $" << (denoms + i)->value << "\n";
+            }
+        }
+
+        delete[] bestUsed;
+        return true;
+    }
+
+private:
+    void backtrack(int idx, int remaining, int usedNotes, int* used,
+                   int* bestUsed, int& minNotes, bool& found) {
+        if (remaining == 0) {
+            if (usedNotes < minNotes) {
+                for (int i = 0; i < denomCount; ++i)
+                    bestUsed[i] = used[i];
+                minNotes = usedNotes;
+                found = true;
+            }
+            return;
+        }
+
+        if (idx >= denomCount) return;
+
+        Denomination* d = denoms + idx;
+        int maxUse = min(*(d->count), remaining / d->value);
+        for (int i = maxUse; i >= 0; --i) {
+            used[idx] = i;
+            backtrack(idx + 1, remaining - i * d->value, usedNotes + i, used, bestUsed, minNotes, found);
+        }
+        used[idx] = 0;
+    }
+};
+
+int main() {
+    cout << "=== ATM Cash Dispenser ===\n";
+
+    // Setup denominations
+    addDenomination(100, 10);
+    addDenomination(50, 10);
+    addDenomination(20, 10);
+    addDenomination(10, 10);
+
+    // Create cash dispensers
+    int machineCount = 2;
+    CashDispenser** machines = new CashDispenser*[machineCount];
+    machines[0] = new GreedyDispenser();
+    machines[1] = new OptimalDispenser();
+
+    // Simulate dispensing
+    int amount;
+    cout << "\nEnter amount to dispense: ";
+    cin >> amount;
+
+    for (int i = 0; i < machineCount; ++i) {
+        machines[i]->dispense(amount);
+        cout << "-----------------------------\n";
+    }
+
+    // Clean up
+    for (int i = 0; i < machineCount; ++i)
+        delete machines[i];
+    delete[] machines;
+
+    for (int i = 0; i < denomCount; ++i)
+        delete denoms[i].count;
+    delete[] denoms;
+
+    return 0;
+}
 
