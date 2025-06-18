@@ -1,112 +1,102 @@
-#include <iostream> 
-#include <algorithm>
+#include <iostream>  // Includes input/output functionality
+#include <algorithm> // Includes algorithms like sort()
 
-using namespace std;
+using namespace std; // Allows using standard names without 'std::'
 
-// Structure to hold denomination value and its count
+// Define a structure to represent a currency denomination
 struct Denomination {
-    int value;
-    int* count; // pointer to hold dynamic count
+    int value;      // The value of the note (e.g., 100, 50)
+    int* count;     // Pointer to the number of such notes available
 };
 
-// Global dynamic array of denominations
+// Global pointer to array of denominations
 Denomination* denoms = nullptr;
+// Count of how many denominations exist
 int denomCount = 0;
 
-// Function to add a new denomination or update existing one
+// Function to add a new denomination dynamically
 void addDenomination(int value, int count) {
-    // If denomination already exists, just add the count
+    // Check if this denomination already exists
     for (int i = 0; i < denomCount; ++i) {
         if ((denoms + i)->value == value) {
-            *(denoms[i].count) += count;
+            *(denoms[i].count) += count; // If it exists, just increase the count
             return;
         }
     }
 
-    // Create new array with space for new denomination
+    // Create a new array to hold one more denomination
     Denomination* newArr = new Denomination[denomCount + 1];
+    // Copy old denominations to new array
     for (int i = 0; i < denomCount; ++i)
         *(newArr + i) = *(denoms + i);
 
-    // Add the new denomination at the end
+    // Add new denomination to the end
     newArr[denomCount].value = value;
     newArr[denomCount].count = new int(count);
 
-    // Replace old array with new one
+    // Delete old array and update global pointer
     delete[] denoms;
     denoms = newArr;
-    ++denomCount;
+    ++denomCount; // Increase the count of denominations
 }
 
-// Function to remove a denomination by value
+// Function to remove a denomination by its value
 void removeDenomination(int value) {
     int index = -1;
-
-    // Find index of the denomination
+    // Find the index of the denomination to remove
     for (int i = 0; i < denomCount; ++i) {
         if ((denoms + i)->value == value) {
             index = i;
             break;
         }
     }
+    if (index == -1) return; // Not found, do nothing
 
-    // If not found, return
-    if (index == -1) return;
-
-    // Create new array without the removed denomination
+    // Create a new array for remaining denominations
     Denomination* newArr = new Denomination[denomCount - 1];
     for (int i = 0, j = 0; i < denomCount; ++i) {
         if (i == index) {
-            delete denoms[i].count; // free memory
+            delete denoms[i].count; // Free memory for removed denomination
             continue;
         }
-        *(newArr + j++) = *(denoms + i);
+        *(newArr + j++) = *(denoms + i); // Copy remaining items
     }
-
-    // Replace old array with new one
     delete[] denoms;
     denoms = newArr;
-    --denomCount;
+    --denomCount; // Decrease the count
 }
 
-// Abstract class for cash dispenser
+// Abstract class for a cash dispenser
 class CashDispenser {
 public:
-    virtual bool dispense(int amount) = 0; // pure virtual method
-    virtual ~CashDispenser() {}
+    virtual bool dispense(int amount) = 0; // Pure virtual function
+    virtual ~CashDispenser() {} // Virtual destructor
 };
 
-// Dispenses using greedy algorithm (largest to smallest)
+// Greedy strategy: give out largest notes first
 class GreedyDispenser : public CashDispenser {
 public:
     bool dispense(int amount) override {
         cout << "\n[Greedy Dispenser] Dispensing $" << amount << "...\n";
-
-        // Backup current counts in case we need to refund
-        int* temp = new int[denomCount];
-        for (int i = 0; i < denomCount; ++i)
-            temp[i] = *(denoms + i)->count;
+        int* temp = new int[denomCount]; // Backup original note counts
+        for (int i = 0; i < denomCount; ++i) temp[i] = *(denoms + i)->count;
 
         // Sort denominations in descending order
         sort(denoms, denoms + denomCount, [](const Denomination& a, const Denomination& b) {
             return a.value > b.value;
         });
 
-        int remaining = amount;
-
-        // Try to use the largest denominations first
+        int remaining = amount; // Amount left to give
         for (int i = 0; i < denomCount && remaining > 0; ++i) {
             Denomination* d = denoms + i;
-            int num = min(*(d->count), remaining / d->value);
-            remaining -= num * d->value;
-            *(d->count) -= num;
-
-            // Output what we dispensed
+            int num = min(*(d->count), remaining / d->value); // Max notes possible
+            remaining -= num * d->value; // Reduce remaining amount
+            *(d->count) -= num; // Decrease note count
             if (num > 0)
                 cout << "Dispensed " << num << " x $" << d->value << "\n";
         }
 
-        // If we couldn't dispense full amount, restore original state
+        // If not fully dispensed, restore original note counts
         if (remaining > 0) {
             cout << "Unable to dispense full amount. Refunding.\n";
             for (int i = 0; i < denomCount; ++i)
@@ -120,27 +110,25 @@ public:
     }
 };
 
-// Dispenses using optimal strategy (minimum number of notes)
+// Optimal strategy: use fewest notes (brute-force)
 class OptimalDispenser : public CashDispenser {
 public:
     bool dispense(int amount) override {
         cout << "\n[Optimal Dispenser] Dispensing $" << amount << " (minimal notes)...\n";
-
-        int minNotes = INT_MAX;
-        int* bestUsed = new int[denomCount]{}; // best note usage
+        int minNotes = INT_MAX; // Track fewest notes used
+        int* bestUsed = new int[denomCount]{}; // Best note combination
         bool found = false;
 
-        // Try all combinations using backtracking
+        // Start recursive backtracking search
         backtrack(0, amount, 0, new int[denomCount]{}, bestUsed, minNotes, found);
 
-        // If no solution found
         if (!found) {
             cout << "Unable to dispense full amount.\n";
             delete[] bestUsed;
             return false;
         }
 
-        // Dispense the best combination found
+        // Dispense the best found combination
         for (int i = 0; i < denomCount; ++i) {
             if (bestUsed[i] > 0) {
                 *(denoms + i)->count -= bestUsed[i];
@@ -153,71 +141,66 @@ public:
     }
 
 private:
-    // Recursive function to find the best combination (backtracking)
+    // Recursive function to try all combinations of notes
     void backtrack(int idx, int remaining, int usedNotes, int* used,
                    int* bestUsed, int& minNotes, bool& found) {
-        // If exact amount is matched
-        if (remaining == 0) {
+        if (remaining == 0) { // Found valid solution
             if (usedNotes < minNotes) {
                 for (int i = 0; i < denomCount; ++i)
-                    bestUsed[i] = used[i];
+                    bestUsed[i] = used[i]; // Save this as best so far
                 minNotes = usedNotes;
                 found = true;
             }
             return;
         }
 
-        // If we've checked all denominations
-        if (idx >= denomCount) return;
+        if (idx >= denomCount) return; // End of denominations
 
         Denomination* d = denoms + idx;
-        int maxUse = min(*(d->count), remaining / d->value);
-
-        // Try all possible counts of current denomination
+        int maxUse = min(*(d->count), remaining / d->value); // Max notes we can use
         for (int i = maxUse; i >= 0; --i) {
             used[idx] = i;
             backtrack(idx + 1, remaining - i * d->value, usedNotes + i, used, bestUsed, minNotes, found);
         }
-
-        used[idx] = 0; // reset for other paths
+        used[idx] = 0; // Reset
     }
 };
 
 int main() {
     cout << "=== ATM Cash Dispenser ===\n";
 
-    // Initialize available denominations
+    // Add different denominations with initial counts
     addDenomination(100, 10);
     addDenomination(50, 10);
     addDenomination(20, 10);
     addDenomination(10, 10);
 
-    // Create both greedy and optimal dispensers
+    // Create an array of cash dispenser machines
     int machineCount = 2;
     CashDispenser** machines = new CashDispenser*[machineCount];
-    machines[0] = new GreedyDispenser();
-    machines[1] = new OptimalDispenser();
+    machines[0] = new GreedyDispenser(); // First is greedy strategy
+    machines[1] = new OptimalDispenser(); // Second is optimal strategy
 
-    // Ask user how much money to dispense
+    // Ask user how much they want to withdraw
     int amount;
     cout << "\nEnter amount to dispense: ";
     cin >> amount;
 
-    // Try dispensing with both machines
+    // Try dispensing using both machines
     for (int i = 0; i < machineCount; ++i) {
         machines[i]->dispense(amount);
         cout << "-----------------------------\n";
     }
 
-    // Clean up memory
+    // Clean up memory for machines
     for (int i = 0; i < machineCount; ++i)
         delete machines[i];
     delete[] machines;
 
+    // Clean up memory for denominations
     for (int i = 0; i < denomCount; ++i)
         delete denoms[i].count;
     delete[] denoms;
 
-    return 0;
+    return 0; // End of program
 }
-
